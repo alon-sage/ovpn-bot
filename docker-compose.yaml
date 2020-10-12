@@ -1,0 +1,91 @@
+version: "3.7"
+
+volumes:
+  pki:
+  server_certs:
+  bot_certs:
+
+services:
+  ovpn_init:
+    build:
+      context: ./ovpn_init
+      args:
+        EASYRSA_REQ_COUNTRY: RU
+        EASYRSA_REQ_PROVINCE: MOSCOW
+        EASYRSA_REQ_CITY: MOSCOW
+        EASYRSA_REQ_ORG: Automated IM
+        EASYRSA_REQ_EMAIL: ovpn.bot@automated.im
+    restart: "no"
+    volumes:
+      - type: volume
+        source: pki
+        target: /easyrsa/pki
+      - type: volume
+        source: server_certs
+        target: /easyrsa/server_certs
+      - type: volume
+        source: bot_certs
+        target: /easyrsa/bot_certs
+
+  ovpn_postgres:
+    build:
+      context: ./ovpn_postgres
+    restart: always
+    secrets:
+      - database.password
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/database.password
+    ports:
+      - "127.0.0.1:15432:5432"
+
+  ovpn_bot:
+    build:
+      context: .
+    restart: always
+    depends_on:
+      - ovpn_init
+      - ovpn_postgres
+    links:
+      - ovpn_postgres
+    secrets:
+      - bot_token
+      - customers_group_id
+      - database.password
+    environment:
+      DATABASE_HOST: ovpn_postgres
+      DATABASE_WAIT: 30
+    volumes:
+      - type: volume
+        source: bot_certs
+        target: /app/certs
+        read_only: true
+        volume:
+          nocopy: true
+
+  ovpn_server:
+    build:
+      context: ovpn_server
+    restart: always
+    depends_on:
+      - ovpn_init
+    volumes:
+      - type: volume
+        source: server_certs
+        target: /app/certs
+        read_only: true
+        volume:
+          nocopy: true
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    ports:
+      - "127.0.0.1:1443:443"
+
+secrets:
+  bot_token:
+    file: ./secrets/bot_token.txt
+  customers_group_id:
+    file: ./secrets/customers_group_id.txt
+  database.password:
+    file: ./secrets/database_password.txt
