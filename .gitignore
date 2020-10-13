@@ -243,3 +243,4 @@ fabric.properties
 
 # Secrets
 /secrets
+/settings

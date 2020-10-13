@@ -155,7 +155,7 @@ def load_config() -> Configuration:
             "port": Integer(default=1443)
         },
         "default": {
-            "max_devices": Integer(default=5)
+            "max_devices": Integer(default=6)
         }
     }
 
