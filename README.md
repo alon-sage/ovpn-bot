@@ -34,8 +34,8 @@ client certificate bundled with appropriate OpenVPN-client configuration.
    
     `secrets/database_password.txt` - password for bot database. Just generate new random.
    
-    <span style="color:red">**Be careful!**</span> Secret files should not contains any extra whitespace characters 
-    nor empty lines at the end as it interpreted as a part of secret value.
+    ‼️ Secret files should not contains any extra whitespace characters 
+    nor empty lines at the end as it interpreted as a part of secret value. ‼️
    
     `settings/ovpn_bot.env` - bot settings
        
