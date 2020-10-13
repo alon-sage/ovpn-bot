@@ -47,7 +47,7 @@ port 443
 ;port 1194
 
 # TCP or UDP server?
-proto tcp
+proto tcp4
 ;proto udp
 
 # "dev tun" will create a routed IP tunnel,
@@ -113,6 +113,7 @@ dh certs/dh.pem
 # Each client will be able to reach the server
 # on 10.8.0.1. Comment this line out if you are
 # ethernet bridging. See the man page for more info.
+server-ipv6 2001:db8:ee00:ee00::10/64
 server 10.8.0.0 255.255.0.0
 
 # Maintain a record of client <-> virtual IP address
@@ -164,7 +165,7 @@ ifconfig-pool-persist /var/log/openvpn/ipp.txt
 # (The OpenVPN server machine may need to NAT
 # or bridge the TUN/TAP interface to the internet
 # in order for this to work properly).
-push "redirect-gateway def1 bypass-dhcp"
+push "redirect-gateway def1 ipv6 bypass-dhcp"
 
 # Certain Windows-specific network settings
 # can be pushed to clients, such as DNS
@@ -172,6 +173,8 @@ push "redirect-gateway def1 bypass-dhcp"
 # http://openvpn.net/faq.html#dhcpcaveats
 # The addresses below refer to the public
 # DNS servers provided by opendns.com.
+push "dhcp-option DNS 2620:0:ccc::2"
+push "dhcp-option DNS 2620:0:ccd::2"
 push "dhcp-option DNS 208.67.222.222"
 push "dhcp-option DNS 208.67.220.220"
 
