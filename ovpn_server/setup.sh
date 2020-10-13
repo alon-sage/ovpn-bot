@@ -2,6 +2,14 @@
 
 set -e
 
+echo "Contents of up.sh"
+cat <<EOF | tee up.sh
+#!/usr/bin/env bash
+
+iptables -t nat -A POSTROUTING -o eth0 -s 10.8.0.0/16 -j MASQUERADE
+EOF
+chmod +x up.sh
+
 echo "Contents of server.conf"
 cat <<EOF | tee server.conf
 #################################################
@@ -271,7 +279,7 @@ status /var/log/openvpn/openvpn-status.log
 # 4 is reasonable for general usage
 # 5 and 6 can help to debug connection problems
 # 9 is extremely verbose
-verb 3
+verb 5
 
 # Silence repeating messages.  At most 20
 # sequential messages of the same message
@@ -281,5 +289,9 @@ verb 3
 # Notify the client that when the server restarts so it
 # can automatically reconnect.
 explicit-exit-notify 0
+
+#Start script
+up /app/up.sh
+script-security 2
 EOF
 
