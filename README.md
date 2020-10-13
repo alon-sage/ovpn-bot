@@ -15,8 +15,9 @@ client certificate bundled with appropriate OpenVPN-client configuration.
 1.  Create private group to manage your users and 
     add your bot to it as administrator.
 
-1.  Obtain your group id by sending `/chat_id` command to bot.
-    It will be used in next steps.
+1.  Obtain your group id by sending any message to group and running command
+    `curl https://api.telegram.org/bot<token>/getUpdates`.
+    There is `id` field of the `chat` object and this is your group id.
 
 1.  Clone project:
     ```bash
