@@ -3,6 +3,8 @@ FROM ubuntu:18.04
 RUN apt-get update && apt-get install -y \
     openvpn \
     iptables \
+    curl \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 COPY setup.sh /setup.sh

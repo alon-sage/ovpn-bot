@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 
 volumes:
   pki:
@@ -97,6 +97,19 @@ services:
     ports:
       - "127.0.0.1:1443:443"
 
+  ipv6_nat:
+    image: robbertkl/ipv6nat
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    command: ["--retry", "--debug", "--cleanup"]
+
 secrets:
   bot_token:
     file: ./secrets/bot_token.txt
@@ -104,3 +117,13 @@ secrets:
     file: ./secrets/customers_group_id.txt
   database.password:
     file: ./secrets/database_password.txt
+
+networks:
+  default:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/20
+        - subnet: fd00:dead:beef::/48
