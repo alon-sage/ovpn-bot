@@ -1,0 +1,57 @@
+@startuml
+
+skinparam defaultTextAlignment center
+skinparam monochrome true
+skinparam shadowing<<volume>> false
+skinparam rectangle {
+    RoundCorner 25
+    BackgroundColor<<volume>> transparent
+    BorderColor<<volume>> transparent
+}
+
+!define ICONURL https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/v2.2.0
+!includeurl ICONURL/common.puml
+
+!includeurl ICONURL/material/person.puml
+!includeurl ICONURL/material/smartphone.puml
+!includeurl ICONURL/material/laptop.puml
+!includeurl ICONURL/material/router.puml
+!includeurl ICONURL/material/vpn_lock.puml
+!includeurl ICONURL/font-awesome-5/telegram_plane.puml
+!includeurl ICONURL/font-awesome-5/terminal.puml
+!includeurl ICONURL/font-awesome-5/hdd.puml
+!includeurl ICONURL/devicons2/python.puml
+!includeurl ICONURL/devicons2/postgresql.puml
+
+rectangle "<$smartphone> <$laptop> <$router>\nOpenVPN Client" as ovpn_client
+rectangle "<$person>\nTelegram user" as bot_user
+cloud "<$telegram_plane>\nTelegram" as telegram
+
+rectangle "Docker" {
+rectangle "<$vpn_lock>\nOpenVPN Server" as ovpn_server
+rectangle "<$hdd>\nserver_certs" <<volume>> as server_certs  #line.dashed
+
+rectangle "<$python>\nTelegram bot" as ovpn_bot
+rectangle "<$hdd>\nbot_certs" <<volume>> as bot_certs  #line.dashed
+rectangle "<$postgresql>\nPostgreSQL DB" as ovpn_postgres
+rectangle "<$hdd>\ndatabase" <<volume>> as database  #line.dashed
+
+rectangle "<$hdd>\npki" <<volume>> as pki
+rectangle "<$terminal>\nPKI initializer" as ovpn_init
+}
+
+ovpn_client -d-> ovpn_server
+ovpn_server -d-> server_certs
+
+bot_user -d-> telegram
+telegram <-d- ovpn_bot
+ovpn_bot -d-> bot_certs
+ovpn_bot -d-> ovpn_postgres
+
+ovpn_postgres -d-> database
+
+ovpn_init -u-> pki
+ovpn_init -u-> server_certs
+ovpn_init -u-> bot_certs
+
+@enduml

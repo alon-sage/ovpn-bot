@@ -36,8 +36,8 @@ def parse_args() -> Namespace:
         default=environ.get("BOT_TOKEN"))
 
     parser.add_argument(
-        "--customers-group-id",
-        default=environ.get("CUSTOMERS_GROUP_ID"))
+        "--users-group-id",
+        default=environ.get("USERS_GROUP_ID"))
 
     parser.add_argument(
         "--database.host",
@@ -128,7 +128,7 @@ def parse_args() -> Namespace:
 def load_config() -> Configuration:
     template = {
         "bot_token": String(),
-        "customers_group_id": String(),
+        "users_group_id": String(),
         "database": {
             "host": String(default="localhost"),
             "port": Integer(default=5432),

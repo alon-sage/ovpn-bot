@@ -33,12 +33,12 @@ async def create_bot_dispatcher(
         vpn_service: VPNService,
         config
 ) -> Dispatcher:
-    customers_group = await bot.get_chat(config["customers_group_id"])
+    users_group = await bot.get_chat(config["users_group_id"])
 
-    def authorize_customer(wrapped):
+    def authorize_user(wrapped):
         @wraps(wrapped)
         async def wrapper(event, *args, **kwargs):
-            member = await customers_group.get_member(event.from_user.id)
+            member = await users_group.get_member(event.from_user.id)
             if member is None:
                 log.info(
                     f"{event.get_command(True)} from {event.from_user.id} @{event.from_user.username}: unauthorized access")
@@ -53,7 +53,7 @@ async def create_bot_dispatcher(
 
     @dispatcher.message_handler(commands=["start", "restart"])
     @dispatcher.callback_query_handler(lambda query: query.data == 'list', state="*")
-    @authorize_customer
+    @authorize_user
     async def list_handler(event: Union[types.Message, types.CallbackQuery], state: FSMContext):
         await state.finish()
 
@@ -85,7 +85,7 @@ async def create_bot_dispatcher(
             await event.answer()
 
     @dispatcher.callback_query_handler(lambda query: query.data == 'add')
-    @authorize_customer
+    @authorize_user
     async def add_handler(query: types.CallbackQuery, state: FSMContext):
         max_devices = config["default"]["max_devices"]
         if await vpn_service.count_devices(query.from_user.id) >= max_devices:
@@ -111,7 +111,7 @@ async def create_bot_dispatcher(
         await query.answer()
 
     @dispatcher.message_handler(lambda message: message.text, state="device_name")
-    @authorize_customer
+    @authorize_user
     async def device_name_handler(message: types.Message, state: FSMContext):
         keyboard_markup = InlineKeyboardMarkup(row_width=2)
         keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
@@ -141,7 +141,7 @@ async def create_bot_dispatcher(
 
     @dispatcher.callback_query_handler(devices_cb.filter(action="details"))
     @dispatcher.callback_query_handler(devices_cb.filter(action="config"))
-    @authorize_customer
+    @authorize_user
     async def details_handler(query: types.CallbackQuery):
         action = devices_cb.parse(query.data)["action"]
         device_id = devices_cb.parse(query.data)["id"]
@@ -172,7 +172,7 @@ async def create_bot_dispatcher(
         await query.answer()
 
     @dispatcher.callback_query_handler(devices_cb.filter(action="remove"))
-    @authorize_customer
+    @authorize_user
     async def remove_handler(query: types.CallbackQuery):
         device_id = devices_cb.parse(query.data)["id"]
         device = await vpn_service.get_device(query.from_user.id, device_id)
@@ -191,7 +191,7 @@ async def create_bot_dispatcher(
         await query.answer()
 
     @dispatcher.callback_query_handler(devices_cb.filter(action="confirm_removal"))
-    @authorize_customer
+    @authorize_user
     async def confirm_removal_handler(query: types.CallbackQuery):
         device_id = devices_cb.parse(query.data)["id"]
         device = await vpn_service.remove_device(query.from_user.id, device_id)

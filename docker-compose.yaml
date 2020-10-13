@@ -56,7 +56,6 @@ services:
       - ovpn_postgres
     secrets:
       - bot_token
-      - customers_group_id
       - database.password
     environment:
       DATABASE_HOST: ovpn_postgres
@@ -113,8 +112,6 @@ services:
 secrets:
   bot_token:
     file: ./secrets/bot_token.txt
-  customers_group_id:
-    file: ./secrets/customers_group_id.txt
   database.password:
     file: ./secrets/database_password.txt
 
