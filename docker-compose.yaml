@@ -36,7 +36,7 @@ services:
     environment:
       POSTGRES_PASSWORD_FILE: /run/secrets/database.password
     env_file:
-      - "settings.example/ovpn_postgres.env"
+      - "settings/ovpn_postgres.env"
     ports:
       - "127.0.0.1:15432:5432"
 
@@ -57,7 +57,7 @@ services:
       DATABASE_HOST: ovpn_postgres
       DATABASE_WAIT: 30
     env_file:
-      - "settings.example/ovpn_bot.env"
+      - "settings/ovpn_bot.env"
     volumes:
       - type: volume
         source: bot_certs
@@ -73,7 +73,7 @@ services:
     depends_on:
       - ovpn_init
     env_file:
-      - "settings.example/ovpn_server.env"
+      - "settings/ovpn_server.env"
     volumes:
       - type: volume
         source: server_certs
