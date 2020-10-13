@@ -49,7 +49,7 @@ bin/easyrsa build-server-full "OpenVPN Server" nopass
 bin/easyrsa gen-dh
 mkdir server_certs
 cp pki/ca.crt server_certs
-cat pki/ca.crt pki/issued/bot.crt > ca_bundle.crt
+cat pki/ca.crt pki/issued/bot.crt > server_certs/ca_bundle.crt
 cp pki/issued/OpenVPN\ Server.crt server_certs/server.crt
 cp pki/private/OpenVPN\ Server.key server_certs/server.key
 cp pki/dh.pem server_certs
