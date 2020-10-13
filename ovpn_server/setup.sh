@@ -7,6 +7,7 @@ cat <<EOF | tee up.sh
 #!/usr/bin/env bash
 
 iptables -t nat -A POSTROUTING -o eth0 -s 10.8.0.0/16 -j MASQUERADE
+ip6tables -t nat -A POSTROUTING -o eth0 -s 2001:db8:ee00:ee00::10/64 -j MASQUERADE
 EOF
 chmod +x up.sh
 
