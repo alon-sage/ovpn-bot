@@ -135,7 +135,7 @@ class VPNService:
 
             <ca>\n{textwrap.indent(self.__cert_manager.dump_ca().strip(), " " * 12)}
             </ca>
-            <cert>\n{textwrap.indent(device.cert.strip(), " " * 12)}\n{textwrap.indent(self.__cert_manager.dump_root_cert().strip(), " " * 12)}\n{textwrap.indent(self.__cert_manager.dump_ca().strip(), " " * 12)}
+            <cert>\n{textwrap.indent(device.cert.strip(), " " * 12)}
             </cert>
             <key>\n{textwrap.indent(device.pkey.strip(), " " * 12)}
             </key>

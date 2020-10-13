@@ -82,7 +82,7 @@ dev tun
 # Any X509 key management system can be used.
 # OpenVPN can also use a PKCS #12 formatted key file
 # (see "pkcs12" directive in man page).
-ca certs/ca.crt
+ca certs/ca_bundle.crt
 cert certs/server.crt
 key certs/server.key  # This file should be kept secret
 
