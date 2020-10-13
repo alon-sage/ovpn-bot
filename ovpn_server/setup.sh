@@ -279,7 +279,7 @@ status /var/log/openvpn/openvpn-status.log
 # 4 is reasonable for general usage
 # 5 and 6 can help to debug connection problems
 # 9 is extremely verbose
-verb 5
+verb 3
 
 # Silence repeating messages.  At most 20
 # sequential messages of the same message
