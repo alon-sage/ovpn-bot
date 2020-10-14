@@ -107,4 +107,5 @@ client certificate bundled with appropriate OpenVPN-client configuration.
  ## TODO
  
  * [x] IPv6 support
- * [ ] Revocation of removed devices' certificates
+ * [ ] Devices' certificates renovation
+ * [ ] Devices' certificates revocation

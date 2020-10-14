@@ -53,17 +53,22 @@ class VPNService:
             self,
             device_repository: DeviceRepository,
             cert_manager: CertManager,
+            max_devices: int,
             server_host: str,
             server_port: int
     ):
         self.__device_repository = device_repository
         self.__cert_manager = cert_manager
+        self.__max_devices = max_devices
         self.__server_host = server_host
         self.__server_port = server_port
         log.info("VPN service created")
 
-    async def count_devices(self, user_id: int) -> int:
-        return await self.__device_repository.count(user_id)
+    def get_device_quota(self) -> int:
+        return self.__max_devices
+
+    async def has_device_quota(self, user_id: int) -> bool:
+        return await self.__device_repository.count(user_id) < self.__max_devices
 
     async def list_devices(self, user_id: int) -> List[Device]:
         return await self.__device_repository.list(user_id)
@@ -178,6 +183,7 @@ async def create_vpn_service(config) -> VPNService:
     db_config = config["database"]
     db_pool = db_config["pool"]
     server_config = config["server"]
+    default_config = config["default"]
 
     cert_manager = create_cert_manager(config)
     log.info("Cert manager created")
@@ -198,4 +204,9 @@ async def create_vpn_service(config) -> VPNService:
         device_repository = DeviceRepository(pool)
         log.info("Database pool created")
 
-        yield VPNService(device_repository, cert_manager, server_config["host"], server_config["port"])
+        yield VPNService(
+            device_repository,
+            cert_manager,
+            default_config["max_devices"],
+            server_config["host"],
+            server_config["port"])

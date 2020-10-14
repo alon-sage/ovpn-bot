@@ -1,13 +1,13 @@
-from functools import wraps
-from io import BytesIO
 from logging import getLogger
-from typing import Union
+from typing import Union, Dict, Any, Optional
 
-from aiogram import Dispatcher, Bot, types
+from aiogram import Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import Filter, ChatTypeFilter
+from aiogram.dispatcher.filters.filters import AndFilter
 from aiogram.dispatcher.storage import BaseStorage
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, Update, Chat, Message, ChatType
 from aiogram.utils.callback_data import CallbackData
 
 from ovpn_bot.service import VPNService, DeviceDuplicatedError
@@ -27,38 +27,67 @@ async def create_storage(config) -> BaseStorage:
     return MemoryStorage()
 
 
+class GroupMemberFilter(Filter):
+    def __init__(self, users_group: Chat):
+        self.__users_group = users_group
+
+    @classmethod
+    def validate(cls, full_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        raise ValueError("That filter can't be used in filters factory!")
+
+    async def check(self, obj: Union[Message, CallbackQuery]) -> bool:
+        member = await self.__users_group.get_member(obj.from_user.id)
+        is_chat_member = member.is_chat_member()
+        if not is_chat_member:
+            log.info(f"Unauthorized access from {obj.from_user.id} ({obj.from_user.username})")
+            return False
+        return is_chat_member
+
+
 async def create_bot_dispatcher(
         bot: Bot,
         storage: BaseStorage,
         vpn_service: VPNService,
         config
 ) -> Dispatcher:
-    users_group = await bot.get_chat(config["users_group_id"])
-
-    def authorize_user(wrapped):
-        @wraps(wrapped)
-        async def wrapper(event, *args, **kwargs):
-            member = await users_group.get_member(event.from_user.id)
-            if member is None:
-                log.info(
-                    f"{event.get_command(True)} from {event.from_user.id} @{event.from_user.username}: unauthorized access")
-                return
-            return await wrapped(event, *args, **kwargs)
-
-        return wrapper
+    authorized = AndFilter(
+        ChatTypeFilter(ChatType.PRIVATE),
+        GroupMemberFilter(await bot.get_chat(config["users_group_id"])))
 
     dispatcher = Dispatcher(bot=bot, storage=storage)
 
     devices_cb = CallbackData("device", "id", "action")
 
-    @dispatcher.message_handler(commands=["start", "restart"])
-    @dispatcher.callback_query_handler(lambda query: query.data == 'list', state="*")
-    @authorize_user
-    async def list_handler(event: Union[types.Message, types.CallbackQuery], state: FSMContext):
+    @dispatcher.errors_handler()
+    async def error_handler(update: Update, exc: BaseException):
+        if update.message is not None:
+            chat_id = update.message.from_user.id
+        elif update.callback_query is not None:
+            chat_id = update.callback_query.from_user.id
+
+        log.exception(f"Bot failed to handle update from {chat_id}", exc_info=exc)
+
+        keyboard_markup = InlineKeyboardMarkup(row_width=2)
+        keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
+        await bot.send_message(
+            chat_id,
+            "Oh sorry! 😞 There is error occurred. Please contact administrator to solve this problem.",
+            parse_mode="markdown",
+            reply_markup=keyboard_markup)
+
+        if update.message is not None:
+            await update.message.delete()
+        elif update.callback_query is not None:
+            await update.callback_query.message.delete()
+            await update.callback_query.answer()
+
+    @dispatcher.message_handler(authorized, commands=["start", "restart"])
+    @dispatcher.callback_query_handler(authorized, lambda query: query.data == 'list', state="*")
+    async def list_handler(event: Union[Message, CallbackQuery], state: FSMContext):
         await state.finish()
 
-        if isinstance(event, types.Message):
-            await bot.delete_message(event.from_user.id, event.message_id)
+        if isinstance(event, Message):
+            await event.delete()
 
         devices = await vpn_service.list_devices(event.from_user.id)
         keyboard_markup = InlineKeyboardMarkup(row_width=2)
@@ -67,52 +96,40 @@ async def create_bot_dispatcher(
             InlineKeyboardButton("🔄 Refresh", callback_data="list"))
         keyboard_markup.add(*(
             InlineKeyboardButton(device.name, callback_data=devices_cb.new(id=device.id, action="details"))
-            for device in devices
-        ))
-        if devices:
-            await bot.send_message(
-                event.from_user.id,
-                "Choose one of devices or add new.",
-                reply_markup=keyboard_markup)
-        else:
-            await bot.send_message(
-                event.from_user.id,
-                "You have no devices.",
-                reply_markup=keyboard_markup)
+            for device in devices))
+        await bot.send_message(
+            event.from_user.id,
+            "Choose one of your devices." if devices else "You have no devices.",
+            reply_markup=keyboard_markup)
 
         if isinstance(event, CallbackQuery):
             await event.message.delete()
             await event.answer()
 
-    @dispatcher.callback_query_handler(lambda query: query.data == 'add')
-    @authorize_user
-    async def add_handler(query: types.CallbackQuery, state: FSMContext):
-        max_devices = config["default"]["max_devices"]
-        if await vpn_service.count_devices(query.from_user.id) >= max_devices:
-            keyboard_markup = InlineKeyboardMarkup(row_width=2)
-            keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
-            await bot.send_message(
-                query.from_user.id,
-                f"Can't add more than *{max_devices}* devices",
-                parse_mode="markdown",
-                reply_markup=keyboard_markup)
-        else:
+    @dispatcher.callback_query_handler(authorized, lambda query: query.data == 'add')
+    async def add_handler(query: CallbackQuery, state: FSMContext):
+        keyboard_markup = InlineKeyboardMarkup(row_width=2)
+        keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
+        if await vpn_service.has_device_quota(query.from_user.id):
             await state.set_state("device_name")
-            keyboard_markup = InlineKeyboardMarkup(row_width=2)
-            keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
             message = await bot.send_message(
                 query.from_user.id,
                 f"Enter new device name:",
                 reply_markup=keyboard_markup)
             async with state.proxy() as data:
                 data['message_id'] = message.message_id
+        else:
+            await bot.send_message(
+                query.from_user.id,
+                f"Can't add more than *{vpn_service.get_device_quota()}* devices",
+                parse_mode="markdown",
+                reply_markup=keyboard_markup)
 
         await query.message.delete()
         await query.answer()
 
-    @dispatcher.message_handler(lambda message: message.text, state="device_name")
-    @authorize_user
-    async def device_name_handler(message: types.Message, state: FSMContext):
+    @dispatcher.message_handler(authorized, lambda message: message.text, state="device_name")
+    async def device_name_handler(message: Message, state: FSMContext):
         keyboard_markup = InlineKeyboardMarkup(row_width=2)
         keyboard_markup.add(InlineKeyboardButton("<< Back", callback_data="list"))
         try:
@@ -120,12 +137,6 @@ async def create_bot_dispatcher(
         except DeviceDuplicatedError:
             await message.answer(
                 f"Device named *{message.text.strip()}* already exists.",
-                parse_mode="markdown",
-                reply_markup=keyboard_markup)
-        except Exception:
-            log.exception(f"Failed to create device {message.text.strip()} of {message.from_user.id}")
-            await message.answer(
-                f"Failed to create device named *{message.text.strip()}*. Contact administrator to solve this problem.",
                 parse_mode="markdown",
                 reply_markup=keyboard_markup)
         else:
@@ -139,12 +150,12 @@ async def create_bot_dispatcher(
             await bot.delete_message(message.from_user.id, int(data['message_id']))
         await state.finish()
 
-    @dispatcher.callback_query_handler(devices_cb.filter(action="details"))
-    @dispatcher.callback_query_handler(devices_cb.filter(action="config"))
-    @authorize_user
-    async def details_handler(query: types.CallbackQuery):
-        action = devices_cb.parse(query.data)["action"]
-        device_id = devices_cb.parse(query.data)["id"]
+    @dispatcher.callback_query_handler(authorized, devices_cb.filter(action="details"))
+    @dispatcher.callback_query_handler(authorized, devices_cb.filter(action="config"))
+    async def details_handler(query: CallbackQuery):
+        cb_data = devices_cb.parse(query.data)
+        action = cb_data["action"]
+        device_id = cb_data["id"]
         device = await vpn_service.get_device(query.from_user.id, device_id)
 
         keyboard_markup = InlineKeyboardMarkup(row_width=2)
@@ -171,9 +182,8 @@ async def create_bot_dispatcher(
         await query.message.delete()
         await query.answer()
 
-    @dispatcher.callback_query_handler(devices_cb.filter(action="remove"))
-    @authorize_user
-    async def remove_handler(query: types.CallbackQuery):
+    @dispatcher.callback_query_handler(authorized, devices_cb.filter(action="remove"))
+    async def remove_handler(query: CallbackQuery):
         device_id = devices_cb.parse(query.data)["id"]
         device = await vpn_service.get_device(query.from_user.id, device_id)
 
@@ -190,9 +200,8 @@ async def create_bot_dispatcher(
         await query.message.delete()
         await query.answer()
 
-    @dispatcher.callback_query_handler(devices_cb.filter(action="confirm_removal"))
-    @authorize_user
-    async def confirm_removal_handler(query: types.CallbackQuery):
+    @dispatcher.callback_query_handler(authorized, devices_cb.filter(action="confirm_removal"))
+    async def confirm_removal_handler(query: CallbackQuery):
         device_id = devices_cb.parse(query.data)["id"]
         device = await vpn_service.remove_device(query.from_user.id, device_id)
 
@@ -207,9 +216,9 @@ async def create_bot_dispatcher(
         await query.message.delete()
         await query.answer()
 
-    @dispatcher.message_handler(commands=["chat_id"])
-    async def chat_id_handler(message: types.Message):
-        await message.answer(f"Chat ID: {message.chat.id}")
+    @dispatcher.message_handler(authorized, commands=["user_id"])
+    async def chat_id_handler(message: Message):
+        await message.answer(f"User ID: {message.from_user.id}")
 
     log.info("Bot dispatcher created")
     return dispatcher
